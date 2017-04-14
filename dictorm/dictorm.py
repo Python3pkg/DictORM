@@ -10,7 +10,7 @@ from json import dumps
 from copy import deepcopy
 
 try: # pragma: no cover
-    from dictorm.pg import Select, Insert, Update, Delete, And
+    from dictorm.pg import Select, Insert, Update, Delete, And, Join
     from dictorm.pg import Column, Comparison, Operator
     from dictorm.sqlite import Insert as SqliteInsert
     from dictorm.sqlite import Column as SqliteColumn
@@ -151,8 +151,7 @@ class ResultsGenerator:
     create a new ResultsGenerator instance, or flush your Dict.
     """
 
-    def __init__(self, table, query, db):
-        self.table = table
+    def __init__(self, query, db):
         self.query = query
         self.cache = []
         self.completed = False
@@ -176,7 +175,10 @@ class ResultsGenerator:
             self.completed = True
             raise StopIteration
         # Convert returned dictionary to a Dict
-        d = self.table(d)
+        if isinstance(self.query, Join):
+            print(dict(d))
+        else:
+            d = self.query.table(d)
         d._in_db = True
         self.cache.append(d)
         return d
@@ -459,8 +461,8 @@ class Table(object):
             order_by = self.order_by
         elif self.pks:
             order_by = str(self.pks[0])+' ASC'
-        query = Select(self.name, operator_group).order_by(order_by)
-        return ResultsGenerator(self, query, self.db)
+        query = Select(self, operator_group).order_by(order_by)
+        return ResultsGenerator(query, self.db)
 
 
     def get_one(self, *a, **kw):
@@ -483,6 +485,10 @@ class Table(object):
             # Should only be one result
             pass
         return i
+
+
+    def join(self, *tables):
+        return TableJoin(self.db, self, *tables)
 
 
     def count(self):
@@ -555,6 +561,20 @@ class Table(object):
 
 
 
+class TableJoin(object):
+
+    def __init__(self, db, *tables):
+        self.db = db
+        self.db_kind = db.kind
+        self.tables = tables
+
+
+    def get_where(self, *operators_or_comp):
+        return ResultsGenerator(Join(*self.tables).where(*operators_or_comp),
+                self.db)
+
+
+
 class Dict(dict):
     """
     This is a represenation of a database row that behaves exactly like a
@@ -617,7 +637,7 @@ class Dict(dict):
         if not self._in_db:
             # Insert this Dict into it's respective table, interpolating
             # my values into the query
-            query = self._table.db.insert(self._table.name, **items
+            query = self._table.db.insert(self._table, **items
                     ).returning('*')
             self.__execute_query(query)
             self._in_db = True
@@ -629,7 +649,7 @@ class Dict(dict):
                         'Cannot update to {0}, no primary keys defined.'.format(
                     self._table))
             # Update without references, "wheres" are the primary values
-            query = self._table.db.update(self._table.name, **items
+            query = self._table.db.update(self._table, **items
                     ).where(self._old_pk_and or self.pk_and())
             self.__execute_query(query)
             d = self
@@ -644,7 +664,7 @@ class Dict(dict):
         Delete this row from it's table in the database.  Requires primary keys
         to be specified.
         """
-        query = self._table.db.delete(self._table.name).where(
+        query = self._table.db.delete(self._table).where(
                 self._old_pk_and or self.pk_and())
         self.__execute_query(query)
 

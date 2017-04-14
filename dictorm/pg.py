@@ -32,7 +32,7 @@ class Select(object):
 
     def __repr__(self): # pragma: no cover
         return 'Select({0}, {1}, ret:{2}, order:{3}, limit:{4}, offset:{5}'.format(
-                self.table,
+                self.table.name,
                 repr(self.operators_or_comp),
                 self.returning,
                 self._order_by,
@@ -42,7 +42,7 @@ class Select(object):
 
     def __str__(self):
         parts = []
-        formats = {'table':self.table,}
+        formats = {'table':self.table.name,}
         ooc = self.operators_or_comp
         if (isinstance(ooc, Operator) and ooc.operators_or_comp) or (
                 isinstance(ooc, Comparison)
@@ -117,8 +117,8 @@ class Insert(object):
         if self._returning:
             sql += ' RETURNING '+str(self._returning)
         if not self._values:
-            return sql.format(table=self.table, cvp='DEFAULT VALUES')
-        return sql.format(table=self.table,
+            return sql.format(table=self.table.name, cvp='DEFAULT VALUES')
+        return sql.format(table=self.table.name,
                 cvp=self.cvp.format(*self._build_cvp()))
 
 
@@ -131,7 +131,7 @@ class Insert(object):
         if self.append_returning:
             ret = [(sql, values),]
             ret.append((self.last_row.format(
-                self.append_returning, self.table),
+                self.append_returning, self.table.name),
                 []))
             return ret
         return (sql, values)
@@ -159,7 +159,7 @@ class Update(Insert):
 
     def __str__(self):
         parts = []
-        formats = {'table':self.table, 'cvp':self._build_cvp()}
+        formats = {'table':self.table.name, 'cvp':self._build_cvp()}
         if self.operators_or_comp:
             parts.append(' WHERE {comps}')
             formats['comps'] = str(self.operators_or_comp)
@@ -196,6 +196,7 @@ class Comparison(object):
         self.column2 = column2
         self.kind = kind
         self._substratum = None
+        self.join = False
 
     def __repr__(self): # pragma: no cover
         if isinstance(self.column2, Null):
@@ -208,7 +209,9 @@ class Comparison(object):
 
 
     def __str__(self):
-        c1 = self.column1.column
+        c1 = str(self.column1.column)
+        if self.join:
+            return '{0}{1}{2}'.format(str(self.column1), self.kind, str(self.column2))
         if self._null_kind():
             return '{0}{1}'.format(c1, self.kind)
         return '{0}{1}{2}'.format(c1, self.kind, self.interpolation_str)
@@ -229,6 +232,10 @@ class Comparison(object):
         comp._substratum = column
         comp.many = self.many
         return comp
+
+
+    def set_join(self, value):
+        self.join = value
 
 
     def _null_kind(self): return isinstance(self.column2, Null)
@@ -311,9 +318,12 @@ class Operator(object):
     def __init__(self, kind, operators_or_comp):
         self.kind = kind
         self.operators_or_comp = operators_or_comp
+        self.join = False
+
 
     def __repr__(self): # pragma: no cover
         return '{0}{1}'.format(self.kind, repr(self.operators_or_comp))
+
 
     def __str__(self):
         kind = ' {0} '.format(self.kind)
@@ -338,18 +348,57 @@ class Operator(object):
         return self
 
 
+    def set_join(self, value):
+        self.join = value
+        for oc in self.operators_or_comp:
+            oc.set_join(value)
+
+
 
 class Or(Operator):
     def __init__(self, *operators_or_comp):
         super(Or, self).__init__('OR', operators_or_comp)
 
+
 class Xor(Operator):
     def __init__(self, *operators_or_comp):
         super(Xor, self).__init__('XOR', operators_or_comp)
+
 
 class And(Operator):
     def __init__(self, *operators_or_comp):
         super(And, self).__init__('AND', operators_or_comp)
 
+
+
+class Join(object):
+
+    query = 'SELECT * FROM {tables}'
+    operators_or_comp = None
+
+    def __init__(self, *tables):
+        self.tables = []
+        for table in tables:
+            if isinstance(table, str):
+                self.tables.append(table)
+            else:
+                self.tables.append(table.name)
+
+
+    def __str__(self):
+        if self.operators_or_comp:
+            self.query += ' WHERE {comps}'
+        return self.query.format(tables=', '.join(self.tables),
+                comps=self.operators_or_comp)
+
+
+    def build(self):
+        return (str(self), [])
+
+
+    def where(self, operators_or_comp):
+        self.operators_or_comp = operators_or_comp
+        self.operators_or_comp.set_join(True)
+        return self
 
 

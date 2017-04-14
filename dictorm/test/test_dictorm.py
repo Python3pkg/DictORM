@@ -1137,6 +1137,18 @@ class TestPostgresql(PostgresTestBase):
             Person.curs.execute = original_execute
 
 
+    def test_join(self):
+        """
+        Tables can be joined, resulting tables are treated as sub-dicts.
+        """
+        Person, Car = self.db['person'], self.db['car']
+        bobs_car = Car(name='Ford').flush()
+        bob = Person(name='Bob', car_id=bobs_car['id']).flush()
+
+        result = Person.join(Car).get_where(Person['car_id'] == Car['id'])
+        self.assertEqualNoRefs(result, [{'person':bob, 'car':bobs_car,},])
+
+
 
 class SqliteTestBase(object):
 

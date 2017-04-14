@@ -1,16 +1,21 @@
 import unittest
-from dictorm.pg import Select, Insert, Update, Delete, Or, Xor, And, Column, set_sort_keys
+from dictorm.pg import Select, Insert, Update, Delete, Or, Xor, And, Column
+from dictorm.pg import set_sort_keys, Join
 
-class PersonTable(object):
+class Table(object):
     '''fake DictORM Table for testing'''
 
-    name = 'person'
+    def __init__(self, name):
+        self.name = name
+
 
     def __getitem__(self, key):
         return Column(self, key)
 
 
-Person = PersonTable()
+
+Person = Table('person')
+Car = Table('car')
 set_sort_keys(True)
 
 
@@ -222,6 +227,22 @@ class TestSelect(unittest.TestCase):
                     [(1,2),]
                     )
                 )
+
+
+    def test_join(self):
+        q = Join('some_table', 'other_table')
+        self.assertEqual(str(q), "SELECT * FROM some_table, other_table")
+
+        q = Join(Person, Car).where(
+                Person['car_id'] == Car['id'])
+        self.assertEqual(str(q), "SELECT * FROM person, car WHERE "
+                "person.car_id=car.id")
+
+        q = Join(Person, Car).where(
+                And(Person['car_id'] == Car['id'],
+                    Person['car_name'] == Car['name']))
+        self.assertEqual(str(q), "SELECT * FROM person, car WHERE "
+                "person.car_id=car.id AND person.car_name=car.name")
 
 
 
