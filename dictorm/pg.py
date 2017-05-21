@@ -66,7 +66,7 @@ class Select(object):
 
 
     def build(self):
-        return (str(self), self.values())
+        return (str(self), list(self.values()))
 
 
     def order_by(self, order_by):
@@ -102,7 +102,7 @@ class Insert(object):
         self.table = table
         self._values = values
         self._returning = None
-        self._ordered_keys = values.keys()
+        self._ordered_keys = list(values.keys())
         if sort_keys:
             self._ordered_keys = sorted(self._ordered_keys)
 
@@ -127,7 +127,7 @@ class Insert(object):
 
 
     def build(self):
-        sql, values = str(self), self.values()
+        sql, values = str(self), list(self.values())
         if self.append_returning:
             ret = [(sql, values),]
             ret.append((self.last_row.format(
@@ -170,7 +170,7 @@ class Update(Insert):
 
 
     def values(self):
-        values = super(Update, self).values()
+        values = list(super(Update, self).values())
         if self.operators_or_comp:
             values.extend(list(self.operators_or_comp))
         return values

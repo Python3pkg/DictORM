@@ -6,7 +6,7 @@ import psycopg2
 import sqlite3
 import unittest
 
-if 'CI' in os.environ.keys():
+if 'CI' in list(os.environ.keys()):
     test_db_login = {
             'database':'dictorm',
             'user':'postgres',

@@ -10,11 +10,11 @@ from json import dumps
 from copy import deepcopy
 
 try: # pragma: no cover
-    from dictorm.pg import Select, Insert, Update, Delete, And
-    from dictorm.pg import Column, Comparison, Operator
-    from dictorm.sqlite import Insert as SqliteInsert
-    from dictorm.sqlite import Column as SqliteColumn
-    from dictorm.sqlite import Update as SqliteUpdate
+    from .dictorm.pg import Select, Insert, Update, Delete, And
+    from .dictorm.pg import Column, Comparison, Operator
+    from .dictorm.sqlite import Insert as SqliteInsert
+    from .dictorm.sqlite import Column as SqliteColumn
+    from .dictorm.sqlite import Update as SqliteUpdate
 except ImportError: # pragma: no cover
     from .pg import Select, Insert, Update, Delete, And
     from .pg import Column, Comparison, Operator
@@ -49,7 +49,7 @@ def _json_dicts(d):
     """
     Convert all dictionaries contained in this object into JSON strings.
     """
-    for key, value in d.items():
+    for key, value in list(d.items()):
         if isinstance(value, dict):
             d[key] = dumps(value)
     return d
@@ -132,7 +132,7 @@ class DictDB(dict):
         """
         Create all Table instances from all tables found in the database.
         """
-        if self.keys():
+        if list(self.keys()):
             # Reset this DictDB because it contains old tables
             super(DictDB, self).__init__()
         table_cls = self.table_factory()
@@ -167,7 +167,7 @@ def args_to_comp(operator, table, *args, **kwargs):
                     str(table))
         pk_uses += 1
 
-    for k,v in kwargs.items():
+    for k,v in list(kwargs.items()):
         operator += table[k] == v
 
     return operator
@@ -611,7 +611,7 @@ class Dict(dict):
         All references will be flushed as well.
         """
         if self._table.refs:
-            for i in self.values():
+            for i in list(self.values()):
                 if isinstance(i, Dict):
                     i.flush()
 
@@ -671,7 +671,7 @@ class Dict(dict):
         Return an And() of all this Dict's primary key and values. i.e.
         And(id=1, other_primary=4)
         """
-        return And(*[self._table[k]==v for k,v in self.items() if k in \
+        return And(*[self._table[k]==v for k,v in list(self.items()) if k in \
                 self._table.pks])
 
 
@@ -681,7 +681,7 @@ class Dict(dict):
         this Dict in the Database.  This should be used when doing an update of
         another Dict.
         """
-        return dict([(k,v) for k,v in self.items() if k not in self._table.pks])
+        return dict([(k,v) for k,v in list(self.items()) if k not in self._table.pks])
 
 
     def no_refs(self):
@@ -689,7 +689,7 @@ class Dict(dict):
         Return a dictionary without the key/value(s) added by a reference.  They
         should never be sent in the query to the Database.
         """
-        return dict([(k,v) for k,v in self.items() if k not in self._table.refs]
+        return dict([(k,v) for k,v in list(self.items()) if k not in self._table.refs]
                 )
 
 
@@ -697,7 +697,7 @@ class Dict(dict):
         """
         Return a dictionary of only the referenced rows.
         """
-        return dict([(k,v) for k,v in self.items() if k in self._table.refs])
+        return dict([(k,v) for k,v in list(self.items()) if k in self._table.refs])
 
 
     def __getitem__(self, key):
